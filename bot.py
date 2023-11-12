@@ -24,9 +24,9 @@ async def handle_text(client: Client, message) -> None:
         text_data: bytes = text.encode()
         sha256_hash, md5_hash, sha1_hash, sha3_256_hash = calculate_hashes(text_data)
         response_message: str = (
-            f"**SHA-256 Hash:** `{sha256_hash}`\n"
-            f"**MD5 Hash:** `{md5_hash}`\n"
-            f"**SHA-1 Hash:** `{sha1_hash}`\n"
+            f"**SHA-256 Hash:** `{sha256_hash}`\n\n"
+            f"**MD5 Hash:** `{md5_hash}`\n\n"
+            f"**SHA-1 Hash:** `{sha1_hash}`\n\n"
             f"**SHA3-256 Hash:** `{sha3_256_hash}`"
         )
         await client.send_message(message.chat.id, response_message)
@@ -52,10 +52,10 @@ async def handle_photo(client: Client, message) -> None:
 
         # Send the hash information
         response_message: str = (
-            f"**SHA-256 Hash for photo:** `{sha256_hash}`\n"
-            f"**MD5 Hash for photo:** `{md5_hash}`\n"
-            f"**SHA-1 Hash for photo:** `{sha1_hash}`\n"
-            f"**SHA3-256 Hash for photo:** `{sha3_256_hash}`"
+            f"**SHA-256 Hash:** `{sha256_hash}`\n\n"
+            f"**MD5 Hash:** `{md5_hash}`\n\n"
+            f"**SHA-1 Hash:** `{sha1_hash}`\n\n"
+            f"**SHA3-256 Hash:** `{sha3_256_hash}`"
         )
         await client.send_message(message.chat.id, response_message)
     except Exception as e:
