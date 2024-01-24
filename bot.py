@@ -1,113 +1,136 @@
-import os
-import hashlib
-import asyncio
-import aiofiles
-from pyrogram import Client, filters
-from typing import Tuple
 
-API_ID: str = os.environ.get("API_ID")
-API_HASH: str = os.environ.get("API_HASH")
-BOT_TOKEN: str = os.environ.get("BOT_TOKEN")
+import feedparser
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+import time
 
-app: Client = Client("my_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
-def calculate_hashes(data: bytes) -> Tuple[str, str, str, str]:
-    sha256_hash: str = hashlib.sha256(data).hexdigest()
-    md5_hash: str = hashlib.md5(data).hexdigest()
-    sha1_hash: str = hashlib.sha1(data).hexdigest()
-    sha3_256_hash: str = hashlib.sha3_256(data).hexdigest()
-    return sha256_hash, md5_hash, sha1_hash, sha3_256_hash
+def get_yts_feed():
+    rss_url = 'https://yts.mx/rss/0/720p/action/5'
+    return feedparser.parse(rss_url)
 
-async def handle_text(client: Client, message) -> None:
+
+
+def create_html_content(entries):
+    html_content = """
+    <html>
+        <head>
+            <style>
+                body {
+                    font-family: Arial, sans-serif;
+                    background-color: #f4f4f4;
+                }
+                .movie {
+                    border: 1px solid #ddd;
+                    padding: 10px;
+                    margin-bottom: 20px;
+                    background-color: #fff;
+                }
+                .title {
+                    font-size: 18px;
+                    font-weight: bold;
+                    color: #333;
+                }
+                .description {
+                    color: #666;
+                }
+                .imdb-rating {
+                    font-weight: bold;
+                    color: #ff9900;
+                }
+                .poster {
+                    max-width: 100%;
+                    height: auto;
+                }
+            </style>
+        </head>
+        <body>
+    """
+
+    for entry in entries:
+        imdb_rating = entry.description.split('IMDB Rating: ')[1].split('<br />')[0]
+        genre = entry.description.split('Genre: ')[1].split('<br />')[0]
+        size = entry.description.split('Size: ')[1].split('<br />')[0]
+        runtime = entry.description.split('Runtime: ')[1].split('<br />')[0]
+        poster = entry.description.split('src="')[0].split('"')[0]
+        html_content += f"""
+            <div class="movie">
+                <div class="title">{entry.title}</div>
+                <div class="description">{entry.description}</div>
+                <div class="imdb-rating">IMDb Rating: {imdb_rating}</div>
+                <div>Genre: {genre}</div>
+                <div>Size: {size}</div>
+                <div>Runtime: {runtime}</div>
+                <img class="poster" src="{poster} Poster">
+                <div><a href="{entry.link}">Link</a></div>
+                <div>Published Date: {entry.published}</div>
+            </div>
+        """
+
+    html_content += """
+        </body>
+    </html>
+    """
+
+    return html_content
+
+def send_email(subject, html_body, to_email, smtp_server, smtp_port, sender_email, sender_password):
     try:
-        text: str = message.text
-        text_data: bytes = text.encode()
-        sha256_hash, md5_hash, sha1_hash, sha3_256_hash = calculate_hashes(text_data)
-        response_message: str = (
-            f"**SHA-256 Hash:** `{sha256_hash}`\n\n"
-            f"**MD5 Hash:** `{md5_hash}`\n\n"
-            f"**SHA-1 Hash:** `{sha1_hash}`\n\n"
-            f"**SHA3-256 Hash:** `{sha3_256_hash}`"
-        )
-        await client.send_message(message.chat.id, response_message)
-    except Exception as e:
-        await handle_error(client, message, e)
+        # Create a MIME object
+        message = MIMEMultipart('alternative',None,[MIMEText(html_body, "html")])
+        message["From"] = sender_email
+        message["To"] = to_email
+        message["Subject"] = subject
 
-async def handle_photo(client: Client, message) -> None:
-    try:
-        # Inform the user that the image is being processed
-        processing_msg = await client.send_message(message.chat.id, "⌛ Processing image...")
+        # Attach HTML body to the email
         
-        # Download the photo
-        photo_path: str = await client.download_media(message.photo)
+        # Set up the SMTP server
+        with smtplib.SMTP(smtp_server, smtp_port) as server:
+            # Login to the email server
+            server.ehlo()
+            server.starttls()
 
-        # Read the photo data as bytes
-        async with aiofiles.open(photo_path, "rb") as file:
-            photo_data: bytes = await file.read()
+            server.login(sender_email, sender_password)
 
-        sha256_hash, md5_hash, sha1_hash, sha3_256_hash = calculate_hashes(photo_data)
+            # Send the email
+            server.sendmail(sender_email, to_email, message.as_string())
 
-        # Delete the processing message
-        await client.delete_messages(message.chat.id, processing_msg.id)
-
-        # Send the hash information
-        response_message: str = (
-            f"**SHA-256 Hash:** `{sha256_hash}`\n\n"
-            f"**MD5 Hash:** `{md5_hash}`\n\n"
-            f"**SHA-1 Hash:** `{sha1_hash}`\n\n"
-            f"**SHA3-256 Hash:** `{sha3_256_hash}`"
-        )
-        await client.send_message(message.chat.id, response_message)
+        print("Email sent successfully!")
     except Exception as e:
-        await handle_error(client, message, e)
-    finally:
-        # Delete the downloaded photo file
-        if photo_path and os.path.exists(photo_path):
-            os.remove(photo_path)
+        print(f"Error: {e}")
 
-async def handle_error(client: Client, message, error: Exception) -> None:
-    error_message: str = (
-        "An error occurred while processing your request. "
-        "Please try again later or contact the bot owner."
-    )
-    await client.send_message(message.chat.id, error_message)
-    # Log the error for further investigation
-    print(f"Error: {error}")
+def main():
+    to_email = "the.mugunthan@gmail.com"
+    smtp_server = "smtp.gmail.com"  # Replace with your SMTP server
+    smtp_port = 587  # Replace with your SMTP server port (e.g., 587 for TLS)
+    sender_email = "ytsupadates@gmail.com"  # Replace with your email
+    sender_password = "vaos xlsk kbkg qdwq"  # Replace with your email password
 
-@app.on_message(filters.private & filters.command(["start", "help"]))
-async def start_help(client: Client, message) -> None:
-    welcome_message: str = (
-        "👋 Welcome! I am your hash value bot.\n\n"
-        "Send me text or photos, and I'll provide you with SHA-256 and MD5 hashes. 🚀"
-    )
-    await client.send_message(message.chat.id, welcome_message)
+    last_entries = None
 
-@app.on_message(filters.private & filters.command("feedback"))
-async def feedback_command(client: Client, message) -> None:
-    if len(message.text.split(" ")) == 1:
-        feedback_message: str = (
-        "📣 Feel free to provide your feedback or report any issues with the bot.\n\n"
-        "Simply type your feedback, and I'll forward it to the bot owner!\n\n" 
-        "Format `/feedback msg`"
-    )
-        await client.send_message(message.chat.id, feedback_message)
-    else:
-        feedback_message: str = (
-        f"📬 New Feedback from @{message.from_user.username}:\n\n"
-        f"{message.text.replace('/feedback','')}"
-    )
-    # Forward the feedback to the bot owner (you can replace 'owner_user_id' with your user ID)
-        await client.send_message(1271659696, feedback_message)
-        await client.send_message(message.chat.id, "Thank you for your feedback! 🙏")
+    while True:
+        try:
+            feed = get_yts_feed()
 
-@app.on_message(filters.private & filters.text)
-async def text_handler(client: Client, message) -> None:
-    # Handle text asynchronously
-    asyncio.create_task(handle_text(client, message))
+            # Check if there are updates since the last check
+            if last_entries is None or feed.entries != last_entries:
+                print("New updates found!")
 
-@app.on_message(filters.private & filters.photo)
-async def photo_handler(client: Client, message) -> None:
-    # Handle photo asynchronously
-    asyncio.create_task(handle_photo(client, message))
+                # Create HTML content
+                html_content = create_html_content(feed.entries)
 
-app.run()
+                # Send email with HTML content
+                send_email("YTS RSS Updates", html_content, to_email, smtp_server, smtp_port, sender_email, sender_password)
+
+                # Update last entries
+                last_entries = feed.entries
+
+            # Wait for the next check after 1 hour
+            time.sleep(3600)
+
+        except Exception as e:
+            print(f"Error: {e}")
+
+if __name__ == "__main__":
+    main()
