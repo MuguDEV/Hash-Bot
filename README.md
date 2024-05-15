@@ -1,6 +1,7 @@
-# Telegram Hash Bot
+# Telegram Hash Bot [![Pylint](https://github.com/MuguDEV/Hash-Bot/actions/workflows/pylint.yml/badge.svg)](https://github.com/MuguDEV/Hash-Bot/actions/workflows/pylint.yml)
 
 🚀 Calculate SHA-256 and MD5 hashes for text and photos on Telegram with this simple and secure Python bot!
+
 
 ## Features
 - **Text Hashing:** Send any text message, and the bot will provide SHA-256 and MD5 hashes.
