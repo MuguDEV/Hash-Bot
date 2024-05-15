@@ -50,7 +50,7 @@ async def handle_text(client: Client, message) -> None:
             f"**SHA3-256 Hash:** `{sha3_256_hash}`"
         )
         await client.send_message(message.chat.id, response_message)
-    except Exception as e:
+    except (TypeError, ValueError) as e:
         await handle_error(client, message, e)
 
 async def handle_photo(client: Client, message) -> None:
@@ -85,7 +85,7 @@ async def handle_photo(client: Client, message) -> None:
             f"**SHA3-256 Hash:** `{sha3_256_hash}`"
         )
         await client.send_message(message.chat.id, response_message)
-    except Exception as e:
+    except (TypeError, ValueError) as e:
         await handle_error(client, message, e)
     finally:
         # Delete the downloaded photo file
