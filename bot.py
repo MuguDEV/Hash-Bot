@@ -64,7 +64,7 @@ async def handle_photo(client: Client, message) -> None:
     try:
         # Inform the user that the image is being processed
         processing_msg = await client.send_message(message.chat.id, "⌛ Processing image...")
-        
+
         # Download the photo
         photo_path: str = await client.download_media(message.photo)
 
