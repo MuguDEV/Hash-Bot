@@ -1,9 +1,9 @@
 import os
 import hashlib
 import asyncio
+from typing import Tuple
 import aiofiles
 from pyrogram import Client, filters
-from typing import Tuple
 
 API_ID: str = os.environ.get("API_ID")
 API_HASH: str = os.environ.get("API_HASH")
@@ -12,6 +12,7 @@ BOT_TOKEN: str = os.environ.get("BOT_TOKEN")
 app: Client = Client("my_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
 def calculate_hashes(data: bytes) -> Tuple[str, str, str, str]:
+    """Calculate SHA-256, MD5, SHA-1, and SHA3-256 hashes for the given data."""
     sha256_hash: str = hashlib.sha256(data).hexdigest()
     md5_hash: str = hashlib.md5(data).hexdigest()
     sha1_hash: str = hashlib.sha1(data).hexdigest()
@@ -19,6 +20,7 @@ def calculate_hashes(data: bytes) -> Tuple[str, str, str, str]:
     return sha256_hash, md5_hash, sha1_hash, sha3_256_hash
 
 async def handle_text(client: Client, message) -> None:
+    """Handle text messages by calculating hashes."""
     try:
         text: str = message.text
         text_data: bytes = text.encode()
@@ -34,6 +36,7 @@ async def handle_text(client: Client, message) -> None:
         await handle_error(client, message, e)
 
 async def handle_photo(client: Client, message) -> None:
+    """Handle photo messages by calculating hashes."""
     try:
         # Inform the user that the image is being processed
         processing_msg = await client.send_message(message.chat.id, "⌛ Processing image...")
@@ -66,6 +69,7 @@ async def handle_photo(client: Client, message) -> None:
             os.remove(photo_path)
 
 async def handle_error(client: Client, message, error: Exception) -> None:
+    """Handle errors by sending a generic error message."""
     error_message: str = (
         "An error occurred while processing your request. "
         "Please try again later or contact the bot owner."
@@ -76,6 +80,7 @@ async def handle_error(client: Client, message, error: Exception) -> None:
 
 @app.on_message(filters.private & filters.command(["start", "help"]))
 async def start_help(client: Client, message) -> None:
+    """Handle the /start and /help commands."""
     welcome_message: str = (
         "👋 Welcome! I am your hash value bot.\n\n"
         "Send me text or photos, and I'll provide you with SHA-256 and MD5 hashes. 🚀"
@@ -84,6 +89,7 @@ async def start_help(client: Client, message) -> None:
 
 @app.on_message(filters.private & filters.command("feedback"))
 async def feedback_command(client: Client, message) -> None:
+    """Handle the /feedback command."""
     if len(message.text.split(" ")) == 1:
         feedback_message: str = (
         "📣 Feel free to provide your feedback or report any issues with the bot.\n\n"
@@ -102,12 +108,12 @@ async def feedback_command(client: Client, message) -> None:
 
 @app.on_message(filters.private & filters.text)
 async def text_handler(client: Client, message) -> None:
-    # Handle text asynchronously
+    """Handle text messages asynchronously."""
     asyncio.create_task(handle_text(client, message))
 
 @app.on_message(filters.private & filters.photo)
 async def photo_handler(client: Client, message) -> None:
-    # Handle photo asynchronously
+    """Handle photo messages asynchronously."""
     asyncio.create_task(handle_photo(client, message))
 
 app.run()
