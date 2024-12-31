@@ -5,13 +5,21 @@ A Telegram bot for calculating hash values of text and images.
 import os
 import hashlib
 import asyncio
-from typing import Tuple
+from typing import Tuple, Optional
 import aiofiles
 from pyrogram import Client, filters
+import configparser
 
-API_ID: str = os.environ.get("API_ID")
-API_HASH: str = os.environ.get("API_HASH")
-BOT_TOKEN: str = os.environ.get("BOT_TOKEN")
+# Load configuration from file
+config = configparser.ConfigParser()
+config.read("config.ini")
+
+API_ID: Optional[str] = os.environ.get("API_ID") or config.get("telegram", "API_ID", fallback=None)
+API_HASH: Optional[str] = os.environ.get("API_HASH") or config.get("telegram", "API_HASH", fallback=None)
+BOT_TOKEN: Optional[str] = os.environ.get("BOT_TOKEN") or config.get("telegram", "BOT_TOKEN", fallback=None)
+
+if not API_ID or not API_HASH or not BOT_TOKEN:
+    raise ValueError("Missing API credentials. Please set API_ID, API_HASH, and BOT_TOKEN.")
 
 app: Client = Client("my_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 

@@ -36,6 +36,23 @@
 ## Contributing
 Feel free to contribute, report issues, or suggest improvements! Your feedback is highly appreciated.
 
+## Setting up Telegram API credentials
+To set up the Telegram API credentials, follow these steps:
 
+1. Go to [my.telegram.org](https://my.telegram.org) and log in with your Telegram account.
+2. Click on "API Development Tools" and create a new application.
+3. Note down the `API_ID` and `API_HASH` provided.
+4. Create a new bot on Telegram by talking to the [BotFather](https://t.me/botfather) and note down the `BOT_TOKEN`.
+
+## Deployment
+To deploy the bot, you can use platforms like Heroku, Railway, or any other cloud service provider. Here are the steps to deploy on Railway:
+
+1. Sign up for a Railway account at [railway.app](https://railway.app).
+2. Create a new project and link your GitHub repository.
+3. Set the environment variables `API_ID`, `API_HASH`, and `BOT_TOKEN` in the Railway project settings.
+4. Deploy the project.
+
+## Badges
+[![Dependency Review](https://github.com/MuguDEV/Hash-Bot/actions/workflows/dependency-review.yml/badge.svg)](https://github.com/MuguDEV/Hash-Bot/actions/workflows/dependency-review.yml)
 
 Happy hashing! 🚀
