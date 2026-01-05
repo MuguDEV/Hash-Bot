@@ -7,7 +7,9 @@ import hashlib
 import asyncio
 from typing import Tuple, Optional
 import aiofiles
+import aiohttp
 from pyrogram import Client, filters
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 import configparser
 
 # Load configuration from file
@@ -17,6 +19,7 @@ config.read("config.ini")
 API_ID: Optional[str] = os.environ.get("API_ID") or config.get("telegram", "API_ID", fallback=None)
 API_HASH: Optional[str] = os.environ.get("API_HASH") or config.get("telegram", "API_HASH", fallback=None)
 BOT_TOKEN: Optional[str] = os.environ.get("BOT_TOKEN") or config.get("telegram", "BOT_TOKEN", fallback=None)
+VIRUSTOTAL_API_KEY: Optional[str] = os.environ.get("VIRUSTOTAL_API_KEY") or config.get("virustotal", "API_KEY", fallback=None)
 
 if not API_ID or not API_HASH or not BOT_TOKEN:
     raise ValueError("Missing API credentials. Please set API_ID, API_HASH, and BOT_TOKEN.")
@@ -38,6 +41,42 @@ def calculate_hashes(data: bytes) -> Tuple[str, str, str, str]:
     sha1_hash: str = hashlib.sha1(data).hexdigest()
     sha3_256_hash: str = hashlib.sha3_256(data).hexdigest()
     return sha256_hash, md5_hash, sha1_hash, sha3_256_hash
+
+async def check_virustotal(file_hash: str) -> str:
+    """
+    Check the file hash against VirusTotal API.
+
+    Args:
+        file_hash (str): The SHA-256 hash of the file.
+
+    Returns:
+        str: A message with the scan result.
+    """
+    if not VIRUSTOTAL_API_KEY:
+        return "⚠️ VirusTotal API Key is not configured."
+
+    url = f"https://www.virustotal.com/api/v3/files/{file_hash}"
+    headers = {"x-apikey": VIRUSTOTAL_API_KEY}
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers=headers) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    stats = data["data"]["attributes"]["last_analysis_stats"]
+                    malicious = stats["malicious"]
+                    total = sum(stats.values())
+
+                    if malicious == 0:
+                        return f"✅ Clean ({malicious}/{total})"
+                    else:
+                        return f"⚠️ Detected ({malicious}/{total})"
+                elif response.status == 404:
+                    return "ℹ️ Hash not found in VirusTotal."
+                else:
+                    return f"❌ Error contacting VirusTotal (Status: {response.status})."
+    except Exception as e:
+        return f"❌ Error: {str(e)}"
 
 async def handle_text(client: Client, message) -> None:
     """
@@ -92,7 +131,14 @@ async def handle_photo(client: Client, message) -> None:
             f"**SHA-1 Hash:** `{sha1_hash}`\n\n"
             f"**SHA3-256 Hash:** `{sha3_256_hash}`"
         )
-        await client.send_message(message.chat.id, response_message)
+
+        # Add VirusTotal Button
+        # Using MD5 because callback_data limit is 64 bytes. SHA256 is 64 chars + prefix > 64.
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🛡 Check VirusTotal", callback_data=f"vt_{md5_hash}")]
+        ])
+
+        await client.send_message(message.chat.id, response_message, reply_markup=keyboard)
     except (TypeError, ValueError) as e:
         await handle_error(client, message, e)
     finally:
@@ -128,7 +174,9 @@ async def start_help(client: Client, message) -> None:
     """
     welcome_message: str = (
         "👋 Welcome! I am your hash value bot.\n\n"
-        "Send me text or photos, and I'll provide you with SHA-256 and MD5 hashes. 🚀"
+        "Send me text or photos, and I'll provide you with SHA-256 and MD5 hashes. 🚀\n\n"
+        "Commands:\n"
+        "/verify <hash> - Verify if a hash matches the replied message."
     )
     await client.send_message(message.chat.id, welcome_message)
 
@@ -157,6 +205,51 @@ async def feedback_command(client: Client, message) -> None:
         await client.send_message(1271659696, feedback_message)
         await client.send_message(message.chat.id, "Thank you for your feedback! 🙏")
 
+@app.on_message(filters.private & filters.command("verify"))
+async def verify_command(client: Client, message) -> None:
+    """
+    Handle the /verify command.
+
+    Args:
+        client (Client): The Pyrogram client.
+        message: The message object.
+    """
+    if not message.reply_to_message or not message.reply_to_message.text:
+        await client.send_message(message.chat.id, "⚠️ Please reply to a message containing the hash you want to verify.")
+        return
+
+    try:
+        command_parts = message.text.split(maxsplit=1)
+        if len(command_parts) < 2:
+            await client.send_message(message.chat.id, "⚠️ Usage: `/verify <hash_to_check>`")
+            return
+
+        user_hash = command_parts[1].strip().lower()
+        original_text = message.reply_to_message.text.lower()
+
+        if user_hash in original_text:
+            await client.send_message(message.chat.id, "✅ Match found! The hash corresponds to the message.")
+        else:
+            await client.send_message(message.chat.id, "❌ No match found.")
+
+    except Exception as e:
+        await handle_error(client, message, e)
+
+@app.on_callback_query(filters.regex(r"^vt_"))
+async def handle_vt_callback(client: Client, callback_query: CallbackQuery) -> None:
+    """
+    Handle VirusTotal check callback.
+    """
+    file_hash = callback_query.data.split("_")[1]
+
+    await callback_query.answer("🔍 Checking VirusTotal...", show_alert=False)
+
+    try:
+        result = await check_virustotal(file_hash)
+        await callback_query.answer(result, show_alert=True)
+    except Exception as e:
+        await callback_query.answer(f"Error: {str(e)}", show_alert=True)
+
 @app.on_message(filters.private & filters.text)
 async def text_handler(client: Client, message) -> None:
     """
@@ -179,4 +272,5 @@ async def photo_handler(client: Client, message) -> None:
     """
     asyncio.create_task(handle_photo(client, message))
 
-app.run()
+if __name__ == "__main__":
+    app.run()

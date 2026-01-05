@@ -2,3 +2,5 @@ pyrogram
 aiofiles
 configparser
 pytest
+aiohttp
+pytest-asyncio
